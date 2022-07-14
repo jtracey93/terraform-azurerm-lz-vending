@@ -5,6 +5,7 @@ package integration
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/Azure/terraform-azurerm-lz-vending/tests/utils"
@@ -17,9 +18,25 @@ const (
 	moduleDir = "../../"
 )
 
-// TestIntegrationHubAndSpoke tests the resource plan when creating a new subscription,
+type TestCases map[string]func(*testing.T)
+
+func TestIntegration(t *testing.T) {
+	tcs := TestCases{
+		"testIntegrationHubAndSpoke":                       testIntegrationHubAndSpoke,
+		"testIntegrationVwan":                              testIntegrationVwan,
+		"testIntegrationSubscriptionAndRoleAssignmentOnly": testIntegrationSubscriptionAndRoleAssignmentOnly,
+		"testIntegrationHubAndSpokeExistingSubscription":   testIntegrationHubAndSpokeExistingSubscription,
+		"testIntegrationWithYaml":                          testIntegrationWithYaml,
+	}
+	for tn, tf := range tcs {
+		t.Run(tn, tf)
+	}
+}
+
+// testIntegrationHubAndSpoke tests the resource plan when creating a new subscription,
 // with a new virtual network with peerings to a supplied hub network.
-func TestIntegrationHubAndSpoke(t *testing.T) {
+func testIntegrationHubAndSpoke(t *testing.T) {
+	t.Parallel()
 	tmp, cleanup, err := utils.CopyTerraformFolderToTempAndCleanUp(t, moduleDir, "")
 	require.NoErrorf(t, err, "failed to copy module to temp: %v", err)
 	defer cleanup()
@@ -48,9 +65,10 @@ func TestIntegrationHubAndSpoke(t *testing.T) {
 	}
 }
 
-// TestIntegrationVwan tests the resource plan when creating a new subscription,
+// testIntegrationVwan tests the resource plan when creating a new subscription,
 // with a new virtual network and vwan connection to a supplied vhub.
-func TestIntegrationVwan(t *testing.T) {
+func testIntegrationVwan(t *testing.T) {
+	t.Parallel()
 	tmp, cleanup, err := utils.CopyTerraformFolderToTempAndCleanUp(t, moduleDir, "")
 	require.NoErrorf(t, err, "failed to copy module to temp: %v", err)
 	defer cleanup()
@@ -78,11 +96,12 @@ func TestIntegrationVwan(t *testing.T) {
 	}
 }
 
-// TestIntegrationSubscriptionAndRoleAssignmentOnly tests the resource plan when creating a new subscription,
+// testIntegrationSubscriptionAndRoleAssignmentOnly tests the resource plan when creating a new subscription,
 // with a role assignments, but no networking.
 // This tests that the depends_on property of the roleassignments module is working
 // when a dependent resource is disabled through the use of count.
-func TestIntegrationSubscriptionAndRoleAssignmentOnly(t *testing.T) {
+func testIntegrationSubscriptionAndRoleAssignmentOnly(t *testing.T) {
+	t.Parallel()
 	tmp, cleanup, err := utils.CopyTerraformFolderToTempAndCleanUp(t, moduleDir, "")
 	require.NoErrorf(t, err, "failed to copy module to temp: %v", err)
 	defer cleanup()
@@ -113,9 +132,10 @@ func TestIntegrationSubscriptionAndRoleAssignmentOnly(t *testing.T) {
 	}
 }
 
-// TestIntegrationHubAndSpokeExistingSubscription tests the resource plan when supplying an existing subscription,
+// testIntegrationHubAndSpokeExistingSubscription tests the resource plan when supplying an existing subscription,
 // with a new virtual network with peerings to a supplied hub network.
-func TestIntegrationHubAndSpokeExistingSubscription(t *testing.T) {
+func testIntegrationHubAndSpokeExistingSubscription(t *testing.T) {
+	t.Parallel()
 	tmp, cleanup, err := utils.CopyTerraformFolderToTempAndCleanUp(t, moduleDir, "")
 	require.NoErrorf(t, err, "failed to copy module to temp: %v", err)
 	defer cleanup()
@@ -144,10 +164,11 @@ func TestIntegrationHubAndSpokeExistingSubscription(t *testing.T) {
 	}
 }
 
-// TestIntegrationWithYaml tests the use of the module with a for_each loop
+// testIntegrationWithYaml tests the use of the module with a for_each loop
 // using YAML files as input.
-func TestIntegrationWithYaml(t *testing.T) {
-	testDir := "testdata/" + t.Name()
+func testIntegrationWithYaml(t *testing.T) {
+	t.Parallel()
+	testDir := "testdata/" + filepath.Base(t.Name())
 	tmp, cleanup, err := utils.CopyTerraformFolderToTempAndCleanUp(t, moduleDir, testDir)
 	require.NoErrorf(t, err, "failed to copy module to temp: %v", err)
 	defer cleanup()
