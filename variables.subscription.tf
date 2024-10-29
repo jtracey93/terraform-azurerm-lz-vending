@@ -26,6 +26,7 @@ DESCRIPTION
 
 variable "subscription_alias_name" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
 The name of the subscription alias.
@@ -40,6 +41,7 @@ DESCRIPTION
 
 variable "subscription_display_name" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
 The display name of the subscription alias.
@@ -54,6 +56,7 @@ DESCRIPTION
 
 variable "subscription_billing_scope" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
 The billing scope for the new subscription alias.
@@ -73,6 +76,7 @@ DESCRIPTION
 
 variable "subscription_workload" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
 The billing scope for the new subscription alias.
@@ -86,6 +90,7 @@ DESCRIPTION
 
 variable "subscription_management_group_id" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
   The destination management group ID for the new subscription.
@@ -108,6 +113,7 @@ DESCRIPTION
 
 variable "subscription_id" {
   type        = string
+  nullable    = false
   default     = ""
   description = <<DESCRIPTION
 An existing subscription id.
@@ -146,5 +152,48 @@ subscription_tags = {
 }
 ```
 DESCRIPTION
+  nullable    = false
   default     = {}
+}
+
+variable "subscription_use_azapi" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+Whether to create a new subscription using the azapi provider. This may be required if the principal running
+terraform does not have the required permissions to create a subscription under the default management group.
+If enabled, the following must also be supplied:
+- `subscription_alias_name`
+- `subscription_display_name`
+- `subscription_billing_scope`
+- `subscription_workload`
+Optionally, supply the following to enable the placement of the subscription into a management group:
+- `subscription_management_group_id`
+- `subscription_management_group_association_enabled`
+If disabled, supply the `subscription_id` variable to use an existing subscription instead.
+> **Note**: When the subscription is destroyed, this module will try to remove the NetworkWatcherRG resource group using `az cli`.
+> This requires the `az cli` tool be installed and authenticated.
+> If the command fails for any reason, the provider will attempt to cancel the subscription anyway.
+DESCRIPTION
+}
+
+variable "subscription_update_existing" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+Whether to update an existing subscription with the supplied tags and display name.
+If enabled, the following must also be supplied:
+- `subscription_id`
+DESCRIPTION
+}
+
+variable "wait_for_subscription_before_subscription_operations" {
+  type = object({
+    create  = optional(string, "30s")
+    destroy = optional(string, "0s")
+  })
+  default     = {}
+  description = <<DESCRIPTION
+The duration to wait after vending a subscription before performing subscription operations.
+DESCRIPTION
 }

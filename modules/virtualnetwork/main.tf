@@ -98,19 +98,19 @@ resource "azapi_update_resource" "vnet" {
 # azapi_resource.peering_hub_outbound creates one-way peering from the spoke to the supplied hub virtual network.
 # They are not created if the hub virtual network is an empty string.
 resource "azapi_resource" "peering_hub_outbound" {
-  for_each  = { for k, v in var.virtual_networks : k => v if v.hub_peering_enabled }
+  for_each  = { for k, v in local.hub_peering_map : k => v if v.peering_direction != local.peering_direction_fromhub }
   type      = "Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2021-08-01"
-  parent_id = local.hub_peering_map[each.key]["outbound"].this_resource_id
-  name      = local.hub_peering_map[each.key]["outbound"].name
+  parent_id = each.value["outbound"].this_resource_id
+  name      = each.value["outbound"].name
   body = jsonencode({
     properties = {
       remoteVirtualNetwork = {
-        id = local.hub_peering_map[each.key]["outbound"].remote_resource_id
+        id = each.value["outbound"].remote_resource_id
       }
       allowVirtualNetworkAccess = true
       allowForwardedTraffic     = true
       allowGatewayTransit       = false
-      useRemoteGateways         = each.value.hub_peering_use_remote_gateways
+      useRemoteGateways         = each.value.use_remote_gateways
     }
   })
 }
@@ -118,14 +118,14 @@ resource "azapi_resource" "peering_hub_outbound" {
 # azapi_resource.peering_hub_inbound creates one-way peering from the supplied hub network to the spoke.
 # They are not created if the hub virtual network is an empty string.
 resource "azapi_resource" "peering_hub_inbound" {
-  for_each  = { for k, v in var.virtual_networks : k => v if v.hub_peering_enabled }
+  for_each  = { for k, v in local.hub_peering_map : k => v if v.peering_direction != local.peering_direction_tohub }
   type      = "Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2021-08-01"
-  parent_id = local.hub_peering_map[each.key]["inbound"].this_resource_id
-  name      = local.hub_peering_map[each.key]["inbound"].name
+  parent_id = each.value["inbound"].this_resource_id
+  name      = each.value["inbound"].name
   body = jsonencode({
     properties = {
       remoteVirtualNetwork = {
-        id = local.hub_peering_map[each.key]["inbound"].remote_resource_id
+        id = each.value["inbound"].remote_resource_id
       }
       allowVirtualNetworkAccess = true
       allowForwardedTraffic     = true
@@ -158,24 +158,28 @@ resource "azapi_resource" "peering_mesh" {
 # azapi_resource.vhubconnection creates a virtual wan hub connection between the spoke and the supplied vwan hub.
 resource "azapi_resource" "vhubconnection" {
   for_each  = { for k, v in var.virtual_networks : k => v if v.vwan_connection_enabled }
-  type      = "Microsoft.Network/virtualHubs/hubVirtualNetworkConnections@2021-08-01"
+  type      = "Microsoft.Network/virtualHubs/hubVirtualNetworkConnections@2022-07-01"
   parent_id = each.value.vwan_hub_resource_id
   name      = coalesce(each.value.vwan_connection_name, "vhc-${uuidv5("url", azapi_resource.vnet[each.key].id)}")
   body = jsonencode({
-    properties = {
+    properties = merge({
       enableInternetSecurity = each.value.vwan_security_configuration.secure_internet_traffic
       remoteVirtualNetwork = {
         id = local.virtual_network_resource_ids[each.key]
       }
-      routingConfiguration = {
-        associatedRouteTable = {
-          id = each.value.vwan_associated_routetable_resource_id != "" ? each.value.vwan_associated_routetable_resource_id : "${each.value.vwan_hub_resource_id}/hubRouteTables/defaultRouteTable"
+      },
+      # Only supply routingConfiguration if routing_intent_enabled is set to false
+      each.value.vwan_security_configuration.routing_intent_enabled ? {} : {
+        routingConfiguration = {
+          associatedRouteTable = {
+            id = each.value.vwan_associated_routetable_resource_id != "" ? each.value.vwan_associated_routetable_resource_id : "${each.value.vwan_hub_resource_id}/hubRouteTables/defaultRouteTable"
+          }
+          propagatedRouteTables = {
+            ids    = each.value.vwan_security_configuration.secure_private_traffic ? local.vwan_propagated_noneroutetables_resource_ids[each.key] : local.vwan_propagated_routetables_resource_ids[each.key]
+            labels = each.value.vwan_security_configuration.secure_private_traffic ? ["none"] : local.vwan_propagated_routetables_labels[each.key]
+          }
         }
-        propagatedRouteTables = {
-          ids    = each.value.vwan_security_configuration.secure_private_traffic == true ? local.vwan_propagated_noneroutetables_resource_ids[each.key] : local.vwan_propagated_routetables_resource_ids[each.key]
-          labels = each.value.vwan_security_configuration.secure_private_traffic == true ? ["none"] : local.vwan_propagated_routetables_labels[each.key]
-        }
-      }
-    }
+    })
   })
+  ignore_body_changes = each.value.vwan_security_configuration.routing_intent_enabled ? ["properties.routingConfiguration"] : []
 }

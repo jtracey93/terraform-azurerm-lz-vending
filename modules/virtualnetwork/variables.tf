@@ -33,6 +33,7 @@ variable "virtual_networks" {
 
     hub_network_resource_id         = optional(string, "")
     hub_peering_enabled             = optional(bool, false)
+    hub_peering_direction           = optional(string, "both")
     hub_peering_name_tohub          = optional(string, "")
     hub_peering_name_fromhub        = optional(string, "")
     hub_peering_use_remote_gateways = optional(bool, true)
@@ -54,6 +55,7 @@ variable "virtual_networks" {
     vwan_security_configuration = optional(object({
       secure_internet_traffic = optional(bool, false)
       secure_private_traffic  = optional(bool, false)
+      routing_intent_enabled  = optional(bool, false)
     }), {})
 
     tags = optional(map(string), {})
@@ -123,6 +125,10 @@ only one of the virtual networks should have `resource_group_creation_enabled` s
 - `vwan_hub_resource_id`: The resource ID of the hub to connect to. [optional - but required if vwan_connection_enabled is `true`]
 - `vwan_propagated_routetables_labels`: A list of labels of route tables to propagate to the virtual network. [optional - leave empty to use `["default"]`]
 - `vwan_propagated_routetables_resource_ids`: A list of resource IDs of route tables to propagate to the virtual network. [optional - leave empty to use `defaultRouteTable` on hub]
+- `vwan_security_configuration`: A map of security configuration values for VWAN hub connection - see below. [optional - default empty]
+  - `secure_internet_traffic`: Whether to forward internet-bound traffic to the destination specified in the routing policy. [optional - default `false`]
+  - `secure_private_traffic`: Whether to all internal traffic to the destination specified in the routing policy. Not compatible with `routing_intent_enabled`. [optional - default `false`]
+  - `routing_intent_enabled`: Enable to use with a Virtual WAN hub with routing intent enabled. Routing intent on hub is configured outside this module. [optional - default `false`]
 
 ### Tags
 

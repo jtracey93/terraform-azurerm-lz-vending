@@ -1,5 +1,5 @@
 <!-- BEGIN_TF_DOCS -->
-# ALZ landing zone role assignment submodule
+# Landing zone role assignment submodule
 
 ## Overview
 
@@ -15,7 +15,7 @@ See [README.md](https://github.com/Azure/terraform-azurerm-lz-vending#readme) in
 ```terraform
 module "roleassignment" {
   source          = "Azure/lz-vending/azurerm/modules/roleassignment"
-  version         = "~> 0.1.0"
+  version         = "<version>" # change this to your desired version, https://www.terraform.io/language/expressions/version-constraints
   role_definition = "Owner"
   scope           = "/subscriptions/00000000-0000-0000-0000-000000000000"
   principal_id    = "00000000-0000-0000-0000-000000000000"
@@ -41,6 +41,18 @@ No modules.
 ## Required Inputs
 
 The following input variables are required:
+
+### <a name="input_role_assignment_condition"></a> [role\_assignment\_condition](#input\_role\_assignment\_condition)
+
+Description: (Optional) The condition that limits the resources that the role can be assigned to.
+
+Type: `string`
+
+### <a name="input_role_assignment_condition_version"></a> [role\_assignment\_condition\_version](#input\_role\_assignment\_condition\_version)
+
+Description: The version of the condition. Possible values are `""`, 1.0 or 2.0. If `""`, null will be set in role\_assignment\_condition and role\_assignment\_condition\_version.
+
+Type: `string`
 
 ### <a name="input_role_assignment_definition"></a> [role\_assignment\_definition](#input\_role\_assignment\_definition)
 
@@ -89,5 +101,4 @@ Description: The Azure resource id of the created role assignment.
 Description: The Azure name (uuid) of the created role assignment.
 
 <!-- markdownlint-enable -->
-
 <!-- END_TF_DOCS -->
