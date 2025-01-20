@@ -29,7 +29,7 @@ func TestDeployVirtualNetworkValid(t *testing.T) {
 	require.NoError(t, err)
 	defer test.Cleanup()
 
-	check.InPlan(test.Plan).NumberOfResourcesEquals(8).ErrorIsNil(t)
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(6).ErrorIsNil(t)
 
 	resources := []string{
 		"azapi_resource.vnet[\"primary\"]",
@@ -38,17 +38,16 @@ func TestDeployVirtualNetworkValid(t *testing.T) {
 		"azapi_update_resource.vnet[\"secondary\"]",
 	}
 	for _, r := range resources {
-		check.InPlan(test.Plan).That(r).Exists().ErrorIsNil(t)
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
 	}
 
 	// defer terraform destroy with retry
-	defer test.DestroyRetry(t, setuptest.DefaultRetry) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
 
 	// check there two outputs for the virtual network resource ids
-	vnri, err := terraform.OutputMapE(t, test.Options, "virtual_network_resource_ids")
-	require.NoErrorf(t, err, "could not get virtual_network_resource_ids output, %s", err)
-	assert.Lenf(t, vnri, 2, "expected 2 virtual networks, got %d", len(vnri))
+	test.Output("virtual_network_resource_ids").Query("primary").Exists().ErrorIsNil(t)
+	test.Output("virtual_network_resource_ids").Query("secondary").Exists().ErrorIsNil(t)
 }
 
 // TestDeployVirtualNetworkValidCustomDns tests the deployment of virtual networks
@@ -68,7 +67,7 @@ func TestDeployVirtualNetworkValidCustomDns(t *testing.T) {
 	require.NoError(t, err)
 	defer test.Cleanup()
 
-	check.InPlan(test.Plan).NumberOfResourcesEquals(8).ErrorIsNil(t)
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(6).ErrorIsNil(t)
 
 	resources := []string{
 		"azapi_resource.vnet[\"primary\"]",
@@ -77,17 +76,16 @@ func TestDeployVirtualNetworkValidCustomDns(t *testing.T) {
 		"azapi_update_resource.vnet[\"secondary\"]",
 	}
 	for _, r := range resources {
-		check.InPlan(test.Plan).That(r).Exists().ErrorIsNil(t)
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
 	}
 
 	// defer terraform destroy with retry
-	defer test.DestroyRetry(t, setuptest.DefaultRetry) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
 
 	// check there two outputs for the virtual network resource ids
-	vnri, err := terraform.OutputMapE(t, test.Options, "virtual_network_resource_ids")
-	require.NoErrorf(t, err, "could not get virtual_network_resource_ids output, %s", err)
-	assert.Lenf(t, vnri, 2, "expected 2 virtual networks, got %d", len(vnri))
+	test.Output("virtual_network_resource_ids").Query("primary").Exists().ErrorIsNil(t)
+	test.Output("virtual_network_resource_ids").Query("secondary").Exists().ErrorIsNil(t)
 }
 
 // TestDeployVirtualNetworkValidVnetPeering tests the deployment of a virtual network
@@ -110,7 +108,7 @@ func TestDeployVirtualNetworkValidVnetPeering(t *testing.T) {
 	require.NoError(t, err)
 	defer test.Cleanup()
 
-	check.InPlan(test.Plan).NumberOfResourcesEquals(14).ErrorIsNil(t)
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(12).ErrorIsNil(t)
 
 	resources := []string{
 		"module.virtualnetwork_test.azapi_resource.vnet[\"primary\"]",
@@ -123,12 +121,53 @@ func TestDeployVirtualNetworkValidVnetPeering(t *testing.T) {
 		"module.virtualnetwork_test.azapi_update_resource.vnet[\"secondary\"]",
 	}
 	for _, r := range resources {
-		check.InPlan(test.Plan).That(r).Exists().ErrorIsNil(t)
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
 	}
 
 	// defer terraform destroy with retry
-	defer test.DestroyRetry(t, setuptest.DefaultRetry) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
+}
+
+// TestDeployVirtualNetworkValidUniDirectionalVnetPeering tests the deployment of a virtual network
+// with unidirectional peering to a hub virtual network.
+func TestDeployVirtualNetworkValidUniDirectionalVnetPeering(t *testing.T) {
+	t.Parallel()
+
+	utils.PreCheckDeployTests(t)
+	testDir := "testdata/" + t.Name()
+	v, err := getValidInputVariables()
+	require.NoErrorf(t, err, "could not generate valid input variables, %s", err)
+	primaryvnet := v["virtual_networks"].(map[string]map[string]any)["primary"]
+	secondaryvnet := v["virtual_networks"].(map[string]map[string]any)["secondary"]
+	primaryvnet["hub_peering_enabled"] = true
+	primaryvnet["hub_peering_direction"] = "fromhub"
+	secondaryvnet["hub_peering_enabled"] = true
+	secondaryvnet["hub_peering_direction"] = "tohub"
+	primaryvnet["hub_peering_use_remote_gateways"] = false
+	secondaryvnet["hub_peering_use_remote_gateways"] = false
+
+	test, err := setuptest.Dirs(moduleDir, testDir).WithVars(v).InitPlanShowWithPrepFunc(t, utils.AzureRmAndRequiredProviders)
+	require.NoError(t, err)
+	defer test.Cleanup()
+
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(10).ErrorIsNil(t)
+
+	resources := []string{
+		"module.virtualnetwork_test.azapi_resource.vnet[\"primary\"]",
+		"module.virtualnetwork_test.azapi_resource.vnet[\"secondary\"]",
+		"module.virtualnetwork_test.azapi_resource.peering_hub_inbound[\"primary\"]",
+		"module.virtualnetwork_test.azapi_resource.peering_hub_outbound[\"secondary\"]",
+		"module.virtualnetwork_test.azapi_update_resource.vnet[\"primary\"]",
+		"module.virtualnetwork_test.azapi_update_resource.vnet[\"secondary\"]",
+	}
+	for _, r := range resources {
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
+	}
+
+	// defer terraform destroy with retry
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
 }
 
 // TestDeployVirtualNetworkValidVhubConnection tests the deployment of a virtual network
@@ -149,7 +188,7 @@ func TestDeployVirtualNetworkValidVhubConnection(t *testing.T) {
 	require.NoError(t, err)
 	defer test.Cleanup()
 
-	check.InPlan(test.Plan).NumberOfResourcesEquals(13).ErrorIsNil(t)
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(11).ErrorIsNil(t)
 
 	resources := []string{
 		"module.virtualnetwork_test.azapi_resource.vnet[\"primary\"]",
@@ -160,7 +199,7 @@ func TestDeployVirtualNetworkValidVhubConnection(t *testing.T) {
 		"module.virtualnetwork_test.azapi_update_resource.vnet[\"secondary\"]",
 	}
 	for _, r := range resources {
-		check.InPlan(test.Plan).That(r).Exists().ErrorIsNil(t)
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
 	}
 
 	// defer terraform destroy with retry
@@ -168,8 +207,47 @@ func TestDeployVirtualNetworkValidVhubConnection(t *testing.T) {
 		Max:  3,
 		Wait: 10 * time.Minute,
 	}
-	defer test.DestroyRetry(t, rty) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(rty) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
+}
+
+// TestDeployVirtualNetworkValidVhubConnectionAndRoutingIntent tests the deployment of a virtual network
+// with a virtual WAN connection and routing intent.
+func TestDeployVirtualNetworkValidVhubConnectionAndRoutingIntent(t *testing.T) {
+	t.Parallel()
+
+	utils.PreCheckDeployTests(t)
+	testDir := "testdata/" + t.Name()
+	v, err := getValidInputVariables()
+	require.NoErrorf(t, err, "could not generate valid input variables, %s", err)
+	primaryvnet := v["virtual_networks"].(map[string]map[string]any)["primary"]
+	secondaryvnet := v["virtual_networks"].(map[string]map[string]any)["secondary"]
+	primaryvnet["vwan_connection_enabled"] = true
+	secondaryvnet["vwan_connection_enabled"] = true
+	primaryvnet["vwan_security_configuration"] = map[string]any{
+		"routing_intent_enabled": true,
+	}
+	secondaryvnet["vwan_security_configuration"] = map[string]any{
+		"routing_intent_enabled": true,
+	}
+
+	test, err := setuptest.Dirs(moduleDir, testDir).WithVars(v).Init(t)
+	require.NoError(t, utils.AzureRmAndRequiredProviders(test))
+
+	require.NoError(t, err)
+	defer test.Cleanup()
+
+	// defer terraform destroy with retry
+	rtyDestroy := setuptest.Retry{
+		Max:  3,
+		Wait: 10 * time.Minute,
+	}
+	rtyApply := setuptest.Retry{
+		Max:  5,
+		Wait: 5 * time.Minute,
+	}
+	defer test.DestroyRetry(rtyDestroy) //nolint:errcheck
+	test.ApplyIdempotentRetry(rtyApply).ErrorIsNil(t)
 }
 
 // TestDeployVirtualNetworkSubnetIdempotency tests that we can make changes
@@ -188,8 +266,8 @@ func TestDeployVirtualNetworkSubnetIdempotency(t *testing.T) {
 	defer test.Cleanup()
 
 	// defer terraform destroy with retry
-	defer test.DestroyRetry(t, setuptest.DefaultRetry) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
 
 	// test an update to vnet address space, then check for subnet still existing
 	primaryvnet := v["virtual_networks"].(map[string]map[string]any)["primary"]
@@ -221,7 +299,7 @@ func TestDeployVirtualNetworkValidMeshPeering(t *testing.T) {
 	require.NoError(t, err)
 	defer test.Cleanup()
 
-	check.InPlan(test.Plan).NumberOfResourcesEquals(10).ErrorIsNil(t)
+	check.InPlan(test.PlanStruct).NumberOfResourcesEquals(8).ErrorIsNil(t)
 
 	resources := []string{
 		"azapi_resource.vnet[\"primary\"]",
@@ -232,12 +310,12 @@ func TestDeployVirtualNetworkValidMeshPeering(t *testing.T) {
 		"azapi_resource.peering_mesh[\"secondary-primary\"]",
 	}
 	for _, r := range resources {
-		check.InPlan(test.Plan).That(r).Exists().ErrorIsNil(t)
+		check.InPlan(test.PlanStruct).That(r).Exists().ErrorIsNil(t)
 	}
 
 	// defer terraform destroy with retry
-	defer test.DestroyRetry(t, setuptest.DefaultRetry) //nolint:errcheck
-	test.ApplyIdempotent(t).ErrorIsNil(t)
+	defer test.DestroyRetry(setuptest.DefaultRetry) //nolint:errcheck
+	test.ApplyIdempotent().ErrorIsNil(t)
 }
 
 func getValidInputVariables() (map[string]any, error) {
@@ -252,16 +330,18 @@ func getValidInputVariables() (map[string]any, error) {
 		"subscription_id": os.Getenv("AZURE_SUBSCRIPTION_ID"),
 		"virtual_networks": map[string]map[string]any{
 			"primary": {
-				"name":                name,
-				"address_space":       []string{"192.168.0.0/24"},
-				"location":            "westeurope",
-				"resource_group_name": name,
+				"name":                        name,
+				"address_space":               []string{"192.168.0.0/24"},
+				"location":                    "westeurope",
+				"resource_group_name":         name,
+				"resource_group_lock_enabled": false,
 			},
 			"secondary": {
-				"name":                name2,
-				"address_space":       []string{"192.168.1.0/24"},
-				"location":            "northeurope",
-				"resource_group_name": name2,
+				"name":                        name2,
+				"address_space":               []string{"192.168.1.0/24"},
+				"location":                    "northeurope",
+				"resource_group_name":         name2,
+				"resource_group_lock_enabled": false,
 			},
 		},
 	}, nil

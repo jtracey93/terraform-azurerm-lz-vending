@@ -38,8 +38,8 @@ You may also supply an empty string if you do not want to create a new subscript
 In this scenario, `subscription_enabled` should be set to `false` and `subscription_id` must be supplied.
 DESCRIPTION
   validation {
-    condition     = can(regex("^$|^[a-zA-Z0-9-_]{1,63}$", var.subscription_alias_name))
-    error_message = "Valid characters are a-z, A-Z, 0-9, -, _."
+    condition     = length(var.subscription_alias_name) <= 64 && !can(regex("[<>;|]", var.subscription_alias_name))
+    error_message = "Subscription Alias must either \"\", or be less or equal to 64 characters in length and cannot contain the characters `<`, `>`, `;`, or `|`"
   }
 }
 
@@ -50,14 +50,14 @@ variable "subscription_display_name" {
 The display name of the subscription alias.
 
 The string must be comprised of a-z, A-Z, 0-9, -, _ and space.
-The maximum length is 63 characters.
+The maximum length is 64 characters.
 
 You may also supply an empty string if you do not want to create a new subscription alias.
 In this scenario, `subscription_enabled` should be set to `false` and `subscription_id` must be supplied.
 DESCRIPTION
   validation {
-    condition     = can(regex("^$|^[a-zA-Z0-9-_ ]{1,63}$", var.subscription_display_name))
-    error_message = "Valid characters are a-z, A-Z, 0-9, -, _, and space."
+    condition     = length(var.subscription_display_name) > 0 && length(var.subscription_display_name) <= 64 && !can(regex("[<>;|]", var.subscription_display_name))
+    error_message = "Subscription Name must be between 1 and 64 characters in length and cannot contain the characters `<`, `>`, `;`, or `|`"
   }
 }
 
@@ -154,4 +154,45 @@ subscription_tags = {
 ```
 DESCRIPTION
   default     = {}
+  validation {
+    error_message = "Tag values must be between 0-256 characters."
+    condition = alltrue(
+      [for _, v in var.subscription_tags : can(regex("^.{0,256}$", v))]
+    )
+  }
+  validation {
+    error_message = "Tag name must contain neither `<>%&\\?/` nor control characters, and must be between 0-512 characters."
+    condition = alltrue(
+      [for k, _ in var.subscription_tags : can(regex("^[^<>%&\\?/[:cntrl:]]{0,512}$", k))]
+    )
+  }
+}
+
+variable "subscription_use_azapi" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+Whether to use the azapi_resource resource to create the subscription alias. This includes the subscription alias in the management group.
+DESCRIPTION
+}
+
+variable "subscription_update_existing" {
+  type        = bool
+  default     = false
+  description = <<DESCRIPTION
+Whether to update an existing subscription with the supplied tags and display name.
+If enabled, the following must also be supplied:
+- `subscription_id`
+DESCRIPTION
+}
+
+variable "wait_for_subscription_before_subscription_operations" {
+  type = object({
+    create  = optional(string, "30s")
+    destroy = optional(string, "0s")
+  })
+  default     = {}
+  description = <<DESCRIPTION
+The duration to wait after vending a subscription before performing subscription operations.
+DESCRIPTION
 }

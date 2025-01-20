@@ -2,11 +2,12 @@
 
 [![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/Azure/terraform-azurerm-lz-vending.svg)](http://isitmaintained.com/project/Azure/terraform-azurerm-lz-vending "Average time to resolve an issue")
 [![Percentage of issues still open](http://isitmaintained.com/badge/open/Azure/terraform-azurerm-lz-vending.svg)](http://isitmaintained.com/project/Azure/terraform-azurerm-lz-vending "Percentage of issues still open")
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Azure/terraform-azurerm-lz-vending/badge)](https://scorecard.dev/viewer/?uri=github.com/Azure/terraform-azurerm-lz-vending)
 
 ## Overview
 
 The landing zone Terraform module is designed to accelerate deployment of individual landing zones within an Azure tenant.
-We use the [AzureRM](https://registry.terraform.io/providers/hashicorp/azurerm/latest) and [AzAPI](https://registry.terraform.io/providers/azure/azapi/latest) providers to create the subscription and deploy the resources in a single `terrafom apply` step.
+We use the [AzureRM](https://registry.terraform.io/providers/hashicorp/azurerm/latest) and [AzAPI](https://registry.terraform.io/providers/azure/azapi/latest) providers to create the subscription and deploy the resources in a single `terraform apply` step.
 
 The module is designed to be instantiated many times, once for each desired landing zone.
 
@@ -18,6 +19,10 @@ This is currently split logically into the following capabilities:
   - vWAN connectivity
   - Mesh peering (peering between spokes)
 - Role assignments
+- Resource provider (and feature) registration
+- Resource group creation
+- User assigned managed identity creation
+  - Federated credential configuration for GitHub Actions, Terraform Cloud, and other providers.
 
 > When creating virtual network peerings, be aware of the [limit of peerings per virtual network](https://learn.microsoft.com/azure/azure-resource-manager/management/azure-subscription-service-limits?toc=%2Fazure%2Fvirtual-network%2Ftoc.json#azure-resource-manager-virtual-networking-limits).
 
@@ -54,6 +59,8 @@ module "lz_vending" {
   subscription_alias_name    = "my-subscription-alias"
   subscription_workload      = "Production"
 
+  network_watcher_resource_group_enabled = true
+
   # management group association variables
   subscription_management_group_association_enabled = true
   subscription_management_group_id                  = "Corp"
@@ -75,6 +82,24 @@ module "lz_vending" {
       hub_peering_enabled     = true
       hub_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-hub-network-rg/providers/Microsoft.Network/virtualNetworks/my-hub-network2"
       mesh_peering_enabled    = true
+    }
+  }
+
+  umi_enabled             = true
+  umi_name                = "umi"
+  umi_resource_group_name = "rg-identity"
+  umi_role_assignments = {
+    myrg-contrib = {
+      definition     = "Contributor"
+      relative_scope = "/resourceGroups/MyRg"
+    }
+  }
+
+  resource_group_creation_enabled = true
+  resource_groups = {
+    myrg = {
+      name     = "MyRg"
+      location = "westeurope"
     }
   }
 

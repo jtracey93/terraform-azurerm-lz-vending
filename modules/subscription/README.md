@@ -1,5 +1,5 @@
 <!-- BEGIN_TF_DOCS -->
-# ALZ landing zone subscription submodule
+# Landing zone subscription submodule
 
 ## Overview
 
@@ -14,7 +14,7 @@ See [README.md](https://github.com/Azure/terraform-azurerm-lz-vending#readme) in
 ```terraform
 module "subscription" {
   source  = "Azure/lz-vending/azurerm/modules/subscription"
-  version = "~> 0.1.0"
+  version = "<version>" # change this to your desired version, https://www.terraform.io/language/expressions/version-constraints
 
   subscription_alias_billing_scope       = "/providers/Microsoft.Billing/billingAccounts/1234567/enrollmentAccounts/123456"
   subscription_alias_display_name        = "my-subscription-display-name"
@@ -31,9 +31,13 @@ module "subscription" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.3.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.4.0)
+
+- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (>= 1.11.0)
 
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.7.0)
+
+- <a name="requirement_time"></a> [time](#requirement\_time) (>= 0.9.1)
 
 ## Modules
 
@@ -112,7 +116,7 @@ Default: `""`
 Description: The display name of the subscription alias.
 
 The string must be comprised of a-z, A-Z, 0-9, -, \_ and space.  
-The maximum length is 63 characters.
+The maximum length is 64 characters.
 
 You may also supply an empty string if you do not want to create a new subscription alias.  
 In this scenario, `subscription_enabled` should be set to `false` and `subscription_id` must be supplied.
@@ -169,6 +173,24 @@ Type: `map(string)`
 
 Default: `{}`
 
+### <a name="input_subscription_update_existing"></a> [subscription\_update\_existing](#input\_subscription\_update\_existing)
+
+Description: Whether to update an existing subscription with the supplied tags and display name.  
+If enabled, the following must also be supplied:
+- `subscription_id`
+
+Type: `bool`
+
+Default: `false`
+
+### <a name="input_subscription_use_azapi"></a> [subscription\_use\_azapi](#input\_subscription\_use\_azapi)
+
+Description: Whether to use the azapi\_resource resource to create the subscription alias. This includes the subscription alias in the management group.
+
+Type: `bool`
+
+Default: `false`
+
 ### <a name="input_subscription_workload"></a> [subscription\_workload](#input\_subscription\_workload)
 
 Description: The billing scope for the new subscription alias.
@@ -182,12 +204,36 @@ Type: `string`
 
 Default: `""`
 
+### <a name="input_wait_for_subscription_before_subscription_operations"></a> [wait\_for\_subscription\_before\_subscription\_operations](#input\_wait\_for\_subscription\_before\_subscription\_operations)
+
+Description: The duration to wait after vending a subscription before performing subscription operations.
+
+Type:
+
+```hcl
+object({
+    create  = optional(string, "30s")
+    destroy = optional(string, "0s")
+  })
+```
+
+Default: `{}`
+
 ## Resources
 
 The following resources are used by this module:
 
+- [azapi_resource.subscription](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource_action.subscription_association](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource_action) (resource)
+- [azapi_resource_action.subscription_cancel](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource_action) (resource)
+- [azapi_resource_action.subscription_rename](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource_action) (resource)
+- [azapi_update_resource.subscription_tags](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/update_resource) (resource)
 - [azurerm_management_group_subscription_association.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_group_subscription_association) (resource)
 - [azurerm_subscription.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subscription) (resource)
+- [terraform_data.replacement](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
+- [time_sleep.wait_for_subscription_before_subscription_operations](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) (resource)
+- [azapi_resource_list.subscription_management_group_association](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/resource_list) (data source)
+- [azapi_resource_list.subscriptions](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/resource_list) (data source)
 
 ## Outputs
 
@@ -209,5 +255,4 @@ Description: The subscription\_resource\_id output is the Azure resource id for 
 Value will be null if `var.subscription_id` is blank and `var.subscription_alias_enabled` is false.
 
 <!-- markdownlint-enable -->
-
 <!-- END_TF_DOCS -->
